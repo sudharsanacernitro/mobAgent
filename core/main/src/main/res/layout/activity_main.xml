@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212"
+    android:padding="16dp">
+
+    <!-- Header: Title + Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="16dp">
+
+        <!-- Sessions Button -->
+        <ImageButton
+            android:id="@+id/btnSessions"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@android:drawable/ic_menu_sort_by_size"
+            android:background="@drawable/icon_circle_bg"
+            android:contentDescription="Sessions"
+            android:padding="8dp"
+            app:tint="#FFFFFF" />
+
+        <!-- App Title -->
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="MobChain"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:gravity="center" />
+
+        <!-- Info Button -->
+        <ImageButton
+            android:id="@+id/checkServerStatus"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@android:drawable/ic_dialog_info"
+            android:background="@drawable/icon_circle_bg"
+            android:contentDescription="Status"
+            android:padding="8dp"
+            app:tint="#FFFFFF" />
+
+<!-- Manage Button -->
+<ImageButton
+    android:id="@+id/manageSettings"
+    android:layout_width="48dp"
+    android:layout_height="48dp"
+    android:src="@android:drawable/ic_menu_manage"
+    android:background="@drawable/icon_circle_bg"
+    android:contentDescription="Manage"
+    android:padding="8dp"
+    app:tint="#FFFFFF" />
+</LinearLayout>
+
+    <!-- Chat Messages -->
+<androidx.recyclerview.widget.RecyclerView
+    android:id="@+id/recyclerChat"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:clipToPadding="false"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"/>
+
+    <!-- Input Bar -->
+<LinearLayout
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:orientation="horizontal"
+android:background="#1E1E1E"
+    android:padding="8dp"
+    android:gravity="center_vertical">
+
+<EditText
+android:id="@+id/msg"
+android:layout_width="0dp"
+android:layout_height="wrap_content"
+android:layout_weight="1"
+android:hint="Type a message"
+android:textColor="#FFFFFF"
+android:textColorHint="#AAAAAA"
+android:textSize="16sp"
+android:background="@android:color/transparent"
+android:padding="16dp"
+android:minHeight="52dp"/>
+
+<Button
+android:id="@+id/sendMsg"
+android:layout_width="wrap_content"
+android:layout_height="wrap_content"
+android:text="Send"
+android:textColor="#FFFFFF"
+android:background="#333333"
+android:padding="12dp"/>
+    </LinearLayout>
+
+    </LinearLayout>

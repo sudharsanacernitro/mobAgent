@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF121212"
+    android:padding="24dp">
+
+    <ImageButton
+        android:id="@+id/btnAddSession"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:src="@android:drawable/ic_input_add"
+        android:background="@drawable/icon_circle_bg"
+        android:contentDescription="Add Session"
+        android:clickable="true"
+        android:focusable="true"
+        app:tint="#FFFFFF" />
+
+    <TextView
+        android:id="@+id/txtSessionTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Chat Sessions"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="64dp"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerSessions"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/txtSessionTitle"
+        android:layout_marginTop="40dp"
+        android:clipToPadding="false"
+        android:paddingBottom="16dp"/>
+
+</RelativeLayout>
+

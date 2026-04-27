@@ -1,0 +1,197 @@
+package com.example.myapplication.ui;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.Spinner;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.myapplication.DAOs.PluginDatabase;
+import com.example.myapplication.DAOs.entities.ConfigHeader;
+import com.example.myapplication.DAOs.entities.FormatterPlugin;
+import com.example.myapplication.DAOs.entities.ModelPlugin;
+import com.example.myapplication.DAOs.entities.ModelPluginWithPluginName;
+import com.example.myapplication.DAOs.entities.Plugin;
+import com.example.myapplication.ui.adapter.ModelPluginListAdapter;
+import com.rk.terminal.R;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Executors;
+
+public class ModelPluginListActivity extends AppCompatActivity {
+
+    private ModelPluginListAdapter adapter;
+    private List<ModelPluginWithPluginName> items;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_model_plugin_list);
+
+        items = new ArrayList<>();
+        adapter = new ModelPluginListAdapter(
+                items,
+                (position, item) -> {
+                    Intent intent = new Intent(this, ModelPluginDetailActivity.class);
+                    intent.putExtra(ModelPluginDetailActivity.EXTRA_MODEL_PLUGIN_ID, item.getModelPlugin().getPluginId());
+                    startActivity(intent);
+                },
+                (position, item) -> {
+                    Executors.newSingleThreadExecutor().execute(() -> {
+                        PluginDatabase.getInstance(this).modelPluginDao().delete(item.getModelPlugin());
+                        runOnUiThread(() -> {
+                            adapter.removeItem(position);
+                            Toast.makeText(this, "Deleted", Toast.LENGTH_SHORT).show();
+                        });
+                    });
+                }
+        );
+
+        RecyclerView recycler = findViewById(R.id.recyclerItems);
+        recycler.setLayoutManager(new LinearLayoutManager(this));
+        recycler.setAdapter(adapter);
+
+        ImageButton btnAdd = findViewById(R.id.btnAdd);
+        btnAdd.setOnClickListener(v -> showAddDialog());
+
+        loadItems();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadItems();
+    }
+
+    private void loadItems() {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            List<ModelPluginWithPluginName> all = PluginDatabase.getInstance(this).modelPluginDao().getAllWithPluginName();
+            runOnUiThread(() -> {
+                items.clear();
+                items.addAll(all);
+                adapter.notifyDataSetChanged();
+            });
+        });
+    }
+
+    private void showAddDialog() {
+        // Load formatters + their plugin names from DB first, then show dialog
+        Executors.newSingleThreadExecutor().execute(() -> {
+            PluginDatabase db = PluginDatabase.getInstance(this);
+            List<FormatterPlugin> formatters = db.formatterDao().getAll();
+            List<String> fmtNames = new ArrayList<>();
+            for (FormatterPlugin fp : formatters) {
+                Plugin p = db.pluginDao().getById(fp.getPluginId());
+                fmtNames.add(p != null ? p.getName() : "Unknown");
+            }
+            runOnUiThread(() -> buildAndShowDialog(formatters, fmtNames));
+        });
+    }
+
+    private void buildAndShowDialog(List<FormatterPlugin> formatters, List<String> fmtNames) {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_model_plugin, null);
+        EditText edtPluginName = dialogView.findViewById(R.id.edtPluginName);
+        EditText edtName = dialogView.findViewById(R.id.edtModelName);
+        EditText edtUrl = dialogView.findViewById(R.id.edtApiUrl);
+        EditText edtTimeout = dialogView.findViewById(R.id.edtTimeout);
+        Spinner spinnerFormatter = dialogView.findViewById(R.id.spinnerFormatter);
+        LinearLayout headersContainer = dialogView.findViewById(R.id.headersContainer);
+        ImageButton btnAddHeader = dialogView.findViewById(R.id.btnAddHeaderInDialog);
+
+        // Populate formatter spinner
+        List<String> formatterNames = new ArrayList<>();
+        formatterNames.add("None");
+        formatterNames.addAll(fmtNames);
+        ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, formatterNames);
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerFormatter.setAdapter(spinnerAdapter);
+
+        List<View> headerRows = new ArrayList<>();
+
+        btnAddHeader.setOnClickListener(v -> {
+            View row = LayoutInflater.from(this).inflate(R.layout.dialog_header_row, headersContainer, false);
+            headersContainer.addView(row);
+            headerRows.add(row);
+            row.findViewById(R.id.btnRemoveRow).setOnClickListener(rv -> {
+                headersContainer.removeView(row);
+                headerRows.remove(row);
+            });
+        });
+
+        new AlertDialog.Builder(this)
+                .setTitle("Add Model Plugin")
+                .setView(dialogView)
+                .setPositiveButton("Add", (dialog, which) -> {
+                    String pluginName = edtPluginName.getText().toString().trim();
+                    String name = edtName.getText().toString().trim();
+                    String url = edtUrl.getText().toString().trim();
+                    int timeout;
+                    try { timeout = Integer.parseInt(edtTimeout.getText().toString().trim()); }
+                    catch (Exception e) { timeout = 30000; }
+
+                    if (pluginName.isEmpty() || name.isEmpty() || url.isEmpty()) {
+                        Toast.makeText(this, "Plugin Name, Model Name and URL are required", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    // Get selected formatter
+                    int selectedPos = spinnerFormatter.getSelectedItemPosition();
+                    Integer formatterId = null;
+                    if (selectedPos > 0) {
+                        formatterId = formatters.get(selectedPos - 1).getPluginId();
+                    }
+
+                    // Collect headers
+                    List<String[]> headers = new ArrayList<>();
+                    for (View row : headerRows) {
+                        String key = ((EditText) row.findViewById(R.id.edtRowKey)).getText().toString().trim();
+                        String val = ((EditText) row.findViewById(R.id.edtRowValue)).getText().toString().trim();
+                        if (!key.isEmpty()) {
+                            headers.add(new String[]{key, val});
+                        }
+                    }
+
+                    Integer finalFormatterId = formatterId;
+                    String finalPluginName = pluginName;
+                    String finalName = name;
+                    String finalUrl = url;
+                    int finalTimeout = timeout;
+                    Executors.newSingleThreadExecutor().execute(() -> {
+                        PluginDatabase db = PluginDatabase.getInstance(this);
+
+                        // Create parent Plugin row first (type 1 = model plugin)
+                        Plugin parentPlugin = new Plugin(finalPluginName, "1.0", true, 1, "");
+                        long pluginId = db.pluginDao().insert(parentPlugin);
+
+                        ModelPlugin mp = new ModelPlugin((int) pluginId, finalName, finalUrl, false, finalTimeout);
+                        mp.setFormatterId(finalFormatterId);
+                        db.modelPluginDao().insert(mp);
+
+                        // Insert headers linked to the plugin_id
+                        for (String[] h : headers) {
+                            db.configHeaderDao().insert(new ConfigHeader((int) pluginId, h[0], h[1]));
+                        }
+
+                        ModelPluginWithPluginName result = new ModelPluginWithPluginName();
+                        result.modelPlugin = mp;
+                        result.pluginName = finalPluginName;
+
+                        runOnUiThread(() -> adapter.addItem(result));
+                    });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+}

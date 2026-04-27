@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF121212"
+    android:padding="24dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="LlamaCpp Server"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="24dp" />
+
+        <!-- Server Status -->
+        <TextView
+            android:id="@+id/txtServerStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Status: Unknown"
+            android:textSize="16sp"
+            android:textColor="#AAAAAA"
+            android:padding="16dp"
+            android:background="#1E1E1E"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Check Server Status -->
+        <Button
+            android:id="@+id/btnCheckStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Check Server Status"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#333333"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Start Server -->
+        <Button
+            android:id="@+id/btnStartServer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Start Server"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#1B5E20"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Stop Server -->
+        <Button
+            android:id="@+id/btnStopServer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Stop Server"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#B71C1C"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Download Binaries -->
+        <Button
+            android:id="@+id/btnDownloadBinaries"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Download LlamaCpp Binaries"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#E65100"
+            android:layout_marginBottom="24dp" />
+
+        <!-- Port Number -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Port Number"
+            android:textSize="14sp"
+            android:textColor="#AAAAAA"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="24dp">
+
+            <EditText
+                android:id="@+id/edtPort"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="number"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#666666"
+                android:backgroundTint="#AAAAAA"
+                android:padding="12dp" />
+
+            <Button
+                android:id="@+id/btnSavePort"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Save"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#333333"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
+
+        <!-- Select Model -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Select Model (.gguf)"
+            android:textSize="14sp"
+            android:textColor="#AAAAAA"
+            android:layout_marginBottom="4dp" />
+
+        <Spinner
+            android:id="@+id/spinnerModels"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#1E1E1E"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:id="@+id/txtSelectedModel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Selected: none"
+            android:textSize="14sp"
+            android:textColor="#AAAAAA"
+            android:padding="8dp"
+            android:layout_marginBottom="12dp" />
+
+    </LinearLayout>
+</ScrollView>
+

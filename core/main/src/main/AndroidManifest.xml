@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <application>
+        <provider
+            android:name="com.rk.AlpineDocumentProvider"
+            android:authorities="${applicationId}.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:icon="@mipmap/ic_launcher"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+       <activity android:name="com.example.myapplication.ui.SettingsActivity" />
+       <activity android:name="com.example.myapplication.ui.LocalLLMActivity" />
+       <activity android:name="com.example.myapplication.ui.ModelPluginListActivity" />
+       <activity android:name="com.example.myapplication.ui.ModelPluginDetailActivity" />
+       <activity android:name="com.example.myapplication.ui.SkillsActivity" />
+       <activity android:name="com.example.myapplication.ui.PublicToolsActivity" />
+       <activity android:name="com.example.myapplication.ui.FormatterPluginActivity" />
+       <activity android:name="com.example.myapplication.ui.MemoryPluginActivity" />
+       <activity android:name="com.example.myapplication.ui.TerminalActivity" />
+       <activity android:name="com.example.myapplication.ui.ChatSessionListActivity" />
+       <activity android:name="com.example.myapplication.ui.LlamaCppActivity" />
+       <!-- <service android:name="com.rk.runner.runners.web.html.HtmlRunner$DevTools"/> -->
+    </application>
+</manifest>
