@@ -178,3 +178,8 @@ Full docs in [`doc/`](./doc/README.md) — every class, entity, pattern, and flo
 | UI Layer | [doc/ui-layer](./doc/ui-layer/ui-layer.md) |
 | Database Layer | [doc/database-layer](./doc/database-layer/database-layer.md) |
 | Build Configuration | [doc/build-configuration](./doc/build-configuration/build-configuration.md) |
+
+
+## Other
+
+ I am looking for AI job.If you found this project interesting lets connect. Email : sudharsanr836@gmail.com
