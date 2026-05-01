@@ -11,7 +11,7 @@ import org.mobchain.memory.InMemory;
 import org.mobchain.messages.HumanMessages;
 import org.mobchain.messages.SystemMessages;
 import org.mobchain.models.ModelInterface;
-import org.mobchain.models.OllamaModel;
+import org.mobchain.models.OpenAIFormatter;
 import org.mobchain.skills.Skill;
 import org.mobchain.tools.ToolsManager;
 
@@ -69,7 +69,7 @@ public class SpawnAgentTool implements Tool {
 
                 memory.setSystemPrompt( new SystemMessages(skill.getDescription()));
 
-                OllamaModel model = OllamaModel.builder()
+                OpenAIFormatter model = OpenAIFormatter.builder()
                         .baseURL("http://127.0.0.1:8080/v1/chat/completions")
                         .model("model")
                         .build();

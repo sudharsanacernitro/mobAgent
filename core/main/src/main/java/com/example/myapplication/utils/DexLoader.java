@@ -11,6 +11,7 @@ import com.example.myapplication.DAOs.PluginDatabase;
 import org.mobAgent.plugin.interfaces.FormatterBuilder;
 import org.mobAgent.plugin.interfaces.FormatterInterface;
 import org.mobAgent.plugin.interfaces.Memory;
+import org.mobchain.models.BuiltInFormatters;
 
 import com.example.myapplication.DAOs.entities.Plugin;
 
@@ -29,6 +30,12 @@ public class DexLoader {
 
 
     public final FormatterBuilder loadFormatter(int formatterPluginId) {
+
+        // Built-in formatters are bundled in the app — no DEX loading required.
+        if (BuiltInFormatters.isBuiltIn(formatterPluginId)) {
+            Log.i("Plugin", "Using built-in formatter (id=" + formatterPluginId + ")");
+            return BuiltInFormatters.getBuilder(formatterPluginId);
+        }
 
         try {
             PluginDatabase db = PluginDatabase.getInstance(this.context);

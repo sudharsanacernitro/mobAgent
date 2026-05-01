@@ -11,7 +11,8 @@ The **Plugin System** gives MobAgent its extensibility superpower. Rather than b
 | File | Description |
 |---|---|
 | [DexLoader](./dex-loader.md) | The Android DEX class loading mechanism |
-| [Formatter Plugins](./formatter-plugins.md) | Custom LLM request/response formatters |
+| [BuiltInFormatters](./built-in-formatters.md) | Code-bundled formatters (no upload needed, default: OpenAI) |
+| [Formatter Plugins](./formatter-plugins.md) | User-uploadable custom LLM request/response formatters |
 | [Memory Plugins](./memory-plugins.md) | Custom conversation memory implementations |
 | [Model Plugins](./model-plugins.md) | Full custom model implementations |
 | [Plugin Database](./plugin-database.md) | How plugins are stored and managed in Room DB |
@@ -78,14 +79,43 @@ Both must reference the **same** `FormatterInterface` class. Since the plugin's 
    Plugin { id, name, path, type, description }
    FormatterPlugin / MemoryPlugin / ModelPlugin (extends Plugin)
 
-3. At agent startup (MainActivity):
-   DexLoader.loadFormatter(formatterPluginId)
-       └── DexClassLoader loads the .dex
-       └── Instantiates "org.mobAgent.FormatterBuilderImpl"
-       └── Calls .build(context, config) → FormatterInterface
+3. At agent startup (MainActivity.initAgent()):
 
-4. FormatterInterface used in ModelInterface.builder().setModel(...)
+   ┌─ Formatter resolution ───────────────────────────────────────┐
+   │  formatterId = ModelPlugin.formatterId                        │
+   │  if BuiltInFormatters.isBuiltIn(formatterId)                 │
+   │      → BuiltInFormatters.getBuilder(id)   ← no DEX, instant │
+   │  else                                                         │
+   │      → DexLoader.loadFormatter(id)        ← DEX class load   │
+   └──────────────────────────────────────────────────────────────┘
+
+   ┌─ Memory resolution ──────────────────────────────────────────┐
+   │  memoryPluginId = ChatSession.memory_plugin_id (null = built-in)│
+   │  if null or BuiltInMemory.isBuiltIn(id)                      │
+   │      → BuiltInMemory.getInstance(id, store) ← no DEX        │
+   │  else                                                         │
+   │      → DEX memory loading (future)                           │
+   └──────────────────────────────────────────────────────────────┘
+
+4. FormatterInterface + Memory used in ModelInterface.builder()
 ```
+
+---
+
+## Built-In Plugins (No Upload Required)
+
+---
+
+## Built-In Plugins (No Upload Required)
+
+MobAgent ships two built-in plugin registries so the app is usable immediately on a fresh install without any JAR uploads:
+
+| Registry | Class | Default ID | Default Name |
+|---|---|---|---|
+| Formatter | `BuiltInFormatters` | `-1` | OpenAI Formatter (Built-in) |
+| Memory | `BuiltInMemory` | `-1` | InMemory (Built-in) |
+
+Negative sentinel IDs are used so they can never collide with Room's positive auto-generated PKs. See [BuiltInFormatters](./built-in-formatters.md) and [BuiltInMemory](../memory-system/built-in-memory.md) for details.
 
 ---
 

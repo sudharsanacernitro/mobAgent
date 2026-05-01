@@ -55,9 +55,9 @@ public class LlmHandler extends Handler {
 
             ctx.get( "memory" , Memory.class ).addAiMessage( res.getJsonAIMessage() );
 
-            if( res.getFunctions().isEmpty() ) {
+            if( res.getFunctions().isEmpty()  ) {
 
-                ctx.put( "ResponseContent" , res.getContent() );
+                ctx.put( "ResponseContent" , res.getContent() != null ? res.getContent() : "" );
 
                 System.out.println("NO function call : End");
 

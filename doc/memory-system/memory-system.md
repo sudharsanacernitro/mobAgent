@@ -10,6 +10,7 @@ The **Memory System** in MobAgent manages the conversation history for AI agents
 
 | File | Description |
 |---|---|
+| [BuiltInMemory](./built-in-memory.md) | Registry of code-bundled memory implementations (default: InMemory) |
 | [InMemory](./in-memory.md) | The in-process RAM-based memory implementation |
 | [MemoryPluginRegistry](./memory-plugin-registry.md) | Dynamic memory plugin loading and management |
 | [Session Persistence](./session-persistence.md) | How chat sessions and messages are persisted to Room DB |
@@ -54,6 +55,20 @@ The memory holds messages in the OpenAI chat format:
 | `HumanMessages` | `org.mobchain.messages` | User's input message |
 | `AiMessages` | `org.mobchain.messages` | LLM's text response |
 | `ToolMessages` | `org.mobchain.messages` | Tool execution result (fed back to LLM) |
+
+---
+
+## Memory Resolution in initAgent()
+
+MobAgent resolves which memory implementation to use based on `memoryPluginId` stored in the `chat_sessions` table:
+
+```
+memoryPluginId = null    →  BuiltInMemory.IN_MEMORY_ID (-1)  →  new InMemory(store)
+memoryPluginId = -1      →  BuiltInMemory.isBuiltIn(-1)      →  new InMemory(store)
+memoryPluginId = 42      →  custom DEX-loaded plugin (future)→  new InMemory(store) [fallback]
+```
+
+`null` is stored in the DB for built-in memory to satisfy the FK constraint on `plugins.id`. At runtime both `null` and `-1` resolve identically to `InMemory`. See [BuiltInMemory](./built-in-memory.md) for full details.
 
 ---
 

@@ -60,6 +60,8 @@ import org.json.JSONObject;
 import org.mobAgent.plugin.interfaces.FormatterBuilder;
 import org.mobAgent.plugin.interfaces.FormatterInterface;
 
+import org.mobAgent.plugin.interfaces.Memory;
+import org.mobchain.memory.BuiltInMemory;
 import org.mobchain.memory.InMemory;
 import org.mobchain.messages.HumanMessages;
 import org.mobchain.messages.SystemMessages;
@@ -69,6 +71,8 @@ import org.mobchain.skills.SkillsScanner;
 import org.mobchain.tools.OwnTools.NativeTools.SpawnAgentTool;
 import org.mobchain.tools.ToolsManager;
 import org.mobchain.tools.ToolsScanner;
+
+import java.util.Map;
 
 
 
@@ -361,8 +365,14 @@ public class MainActivity extends AppCompatActivity {
 
             List<String> memoryNames = new ArrayList<>();
             List<Integer> memoryIds = new ArrayList<>();
-            memoryNames.add("None (In-Memory)");
-            memoryIds.add(-1);
+
+            // Built-in memory implementations (loaded from code, no upload required)
+            for (Map.Entry<Integer, String> entry : BuiltInMemory.getAll().entrySet()) {
+                memoryNames.add(entry.getValue());
+                memoryIds.add(entry.getKey());
+            }
+
+            // User-uploaded memory plugins
             for (MemoryPlugin mem : memoryPlugins) {
                 Plugin p = db.pluginDao().getById(mem.getPluginId());
                 memoryNames.add(p != null ? p.getName() : "Unknown");
@@ -407,22 +417,26 @@ public class MainActivity extends AppCompatActivity {
 
                     int selectedModelId = displayModelIds.get(modelPos);
                     Integer selectedMemoryId = memoryIds.get(memoryPos);
-                    if (selectedMemoryId == -1) selectedMemoryId = null;
 
                     if (selectedModelId == -1) {
                         Toast.makeText(this, "No model plugin available. Add one in Settings first.", Toast.LENGTH_LONG).show();
                         return;
                     }
 
-                    Integer finalMemoryId = selectedMemoryId;
+                    // Store null in DB for built-in memory (FK constraint),
+                    // but pass the sentinel ID to initAgent so it resolves correctly.
+                    Integer memoryIdForDb = (selectedMemoryId != null && BuiltInMemory.isBuiltIn(selectedMemoryId))
+                            ? null : selectedMemoryId;
+                    Integer memoryIdForAgent = selectedMemoryId;
+
                     int finalModelId = selectedModelId;
                     Executors.newSingleThreadExecutor().execute(() -> {
                         if (currentSessionId != -1) {
                             PluginDatabase.getInstance(this).chatSessionDao()
-                                    .updatePlugins(currentSessionId, finalModelId, finalMemoryId);
+                                    .updatePlugins(currentSessionId, finalModelId, memoryIdForDb);
                         }
                         if (alpineReady) {
-                            initAgent(finalModelId, finalMemoryId);
+                            initAgent(finalModelId, memoryIdForAgent);
                         }
                     });
                 })
@@ -456,7 +470,23 @@ public class MainActivity extends AppCompatActivity {
         try {
             PluginDatabase db = PluginDatabase.getInstance(this);
             ChatMessageStore chatMessageStore = new ChatMessageStore(this, currentSessionId);
-            InMemory memory = new InMemory(chatMessageStore);
+
+            // Resolve memory from memoryPluginId
+            Memory memory;
+            if (memoryPluginId == null || BuiltInMemory.isBuiltIn(memoryPluginId)) {
+                // Use the built-in InMemory (default)
+                int builtInId = (memoryPluginId != null) ? memoryPluginId : BuiltInMemory.IN_MEMORY_ID;
+                memory = BuiltInMemory.getInstance(builtInId, chatMessageStore);
+            } else {
+                // TODO: Load custom memory plugin via DEX when supported
+                // For now, fall back to built-in InMemory
+                memory = new InMemory(chatMessageStore);
+            }
+
+            if (memory == null) {
+                System.out.println("Failed to resolve memory for pluginId: " + memoryPluginId);
+                return;
+            }
 
             memory.setSystemPrompt(new SystemMessages(
                     "you are a root agent able to spawn subagents with skills using the tool ***spawn_agent*** . " +

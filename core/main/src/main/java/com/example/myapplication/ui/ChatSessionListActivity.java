@@ -27,8 +27,11 @@ import com.example.myapplication.DAOs.entities.MemoryPlugin;
 import com.example.myapplication.DAOs.entities.Plugin;
 import com.rk.terminal.R;
 
+import org.mobchain.memory.BuiltInMemory;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 
 public class ChatSessionListActivity extends AppCompatActivity {
@@ -90,8 +93,12 @@ public class ChatSessionListActivity extends AppCompatActivity {
 
             List<String> memoryNames = new ArrayList<>();
             List<Integer> memoryIds = new ArrayList<>();
-            memoryNames.add("None");
-            memoryIds.add(-1);
+            // Built-in memory implementations
+            for (Map.Entry<Integer, String> entry : BuiltInMemory.getAll().entrySet()) {
+                memoryNames.add(entry.getValue());
+                memoryIds.add(entry.getKey());
+            }
+            // User-uploaded memory plugins
             for (MemoryPlugin mem : memoryPlugins) {
                 Plugin p = db.pluginDao().getById(mem.getPluginId());
                 memoryNames.add(p != null ? p.getName() : "Unknown");
@@ -176,8 +183,12 @@ public class ChatSessionListActivity extends AppCompatActivity {
 
             List<String> memoryNames = new ArrayList<>();
             List<Integer> memoryIds = new ArrayList<>();
-            memoryNames.add("None (In-Memory)");
-            memoryIds.add(-1);
+            // Built-in memory implementations
+            for (Map.Entry<Integer, String> entry : BuiltInMemory.getAll().entrySet()) {
+                memoryNames.add(entry.getValue());
+                memoryIds.add(entry.getKey());
+            }
+            // User-uploaded memory plugins
             for (MemoryPlugin mem : memoryPlugins) {
                 Plugin p = db.pluginDao().getById(mem.getPluginId());
                 memoryNames.add(p != null ? p.getName() : "Unknown");

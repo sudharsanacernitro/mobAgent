@@ -25,8 +25,11 @@ import com.example.myapplication.DAOs.entities.Plugin;
 import com.example.myapplication.ui.adapter.ModelPluginListAdapter;
 import com.rk.terminal.R;
 
+import org.mobchain.models.BuiltInFormatters;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 
 public class ModelPluginListActivity extends AppCompatActivity {
@@ -109,14 +112,35 @@ public class ModelPluginListActivity extends AppCompatActivity {
         LinearLayout headersContainer = dialogView.findViewById(R.id.headersContainer);
         ImageButton btnAddHeader = dialogView.findViewById(R.id.btnAddHeaderInDialog);
 
-        // Populate formatter spinner
+        // Build parallel display-name/id lists for the formatter spinner.
+        // Order:  [None, <built-in formatters...>, <user-uploaded formatters...>]
         List<String> formatterNames = new ArrayList<>();
+        List<Integer> formatterIdList = new ArrayList<>(); // null = "None"
         formatterNames.add("None");
-        formatterNames.addAll(fmtNames);
+        formatterIdList.add(null);
+
+        // Built-in formatters (loaded from code, no upload required).
+        for (Map.Entry<Integer, String> e : BuiltInFormatters.getAll().entrySet()) {
+            formatterNames.add(e.getValue());
+            formatterIdList.add(e.getKey());
+        }
+
+        // User-uploaded formatter plugins.
+        for (int i = 0; i < formatters.size(); i++) {
+            formatterNames.add(fmtNames.get(i));
+            formatterIdList.add(formatters.get(i).getPluginId());
+        }
+
         ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item, formatterNames);
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerFormatter.setAdapter(spinnerAdapter);
+
+        // Default-select the first built-in formatter so users can proceed
+        // without having uploaded anything.
+        if (formatterNames.size() > 1) {
+            spinnerFormatter.setSelection(1);
+        }
 
         List<View> headerRows = new ArrayList<>();
 
@@ -146,12 +170,11 @@ public class ModelPluginListActivity extends AppCompatActivity {
                         return;
                     }
 
-                    // Get selected formatter
+                    // Get selected formatter id from the parallel id list
                     int selectedPos = spinnerFormatter.getSelectedItemPosition();
-                    Integer formatterId = null;
-                    if (selectedPos > 0) {
-                        formatterId = formatters.get(selectedPos - 1).getPluginId();
-                    }
+                    Integer formatterId = (selectedPos >= 0 && selectedPos < formatterIdList.size())
+                            ? formatterIdList.get(selectedPos)
+                            : null;
 
                     // Collect headers
                     List<String[]> headers = new ArrayList<>();

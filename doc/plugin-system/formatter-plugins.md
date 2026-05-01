@@ -10,6 +10,8 @@ Formatter plugins allow the app to communicate with **different LLM APIs** that 
 - Custom enterprise LLM endpoints
 - APIs with non-standard authentication
 
+MobAgent also ships a **built-in OpenAI formatter** that works out of the box with Ollama, llama-server, OpenAI, and any compatible endpoint — no upload needed. See [BuiltInFormatters](./built-in-formatters.md).
+
 ---
 
 ## FormatterBuilder Interface
@@ -104,6 +106,7 @@ ModelInterface agent = ModelInterface.builder()
 
 ## See Also
 
+- [BuiltInFormatters](./built-in-formatters.md) — code-bundled formatters, no upload required
 - [DexLoader](./dex-loader.md)
 - [Model Plugins](./model-plugins.md)
 - [Plugin Database](./plugin-database.md)

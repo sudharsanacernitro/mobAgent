@@ -114,9 +114,9 @@ MobAgent/
 - [Agent Loop Engine](./agent-loop-engine/agent-loop-engine.md) — How the ReAct loop works, handler chain, MsgContext
 - [Tools System](./tools-system/tools-system.md) — TerminalTool, NativeTool, RAGTool, ToolsScanner, ToolsManager, Executor
 - [Skills System](./skills-system/skills-system.md) — Skill model, SkillsScanner, SpawnAgentTool, sub-agent delegation
-- [Memory System](./memory-system/memory-system.md) — InMemory, MemoryPluginRegistry, session persistence
+- [Memory System](./memory-system/memory-system.md) — BuiltInMemory, InMemory, MemoryPluginRegistry, session persistence
 - [Models Layer](./models-layer/models-layer.md) — FormatterInterface, OllamaModel, ChatModel, ModelRegistry
-- [Plugin System](./plugin-system/plugin-system.md) — DexLoader, FormatterPlugin, MemoryPlugin, ModelPlugin
+- [Plugin System](./plugin-system/plugin-system.md) — BuiltInFormatters, DexLoader, FormatterPlugin, MemoryPlugin, ModelPlugin
 - [Chat Sessions](./chat-sessions/chat-sessions.md) — Session entity, plugin selection dialog, message persistence
 - [LlamaCpp Integration](./llamacpp/llamacpp.md) — Server lifecycle, binary download, model discovery
 - [Terminal Infrastructure](./terminal-infrastructure/terminal-infrastructure.md) — TerminalSessionManager, SshService, Alpine rootfs, llama.cpp

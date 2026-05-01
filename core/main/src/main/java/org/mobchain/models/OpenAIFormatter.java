@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-public class OllamaModel implements FormatterInterface {
+public class OpenAIFormatter implements FormatterInterface {
 
     private String apiUrl = "http://localhost:11434";
     private String model ;
@@ -22,7 +22,7 @@ public class OllamaModel implements FormatterInterface {
 
 
 
-    private OllamaModel( Builder builder ) {
+    private OpenAIFormatter(Builder builder ) {
 
         this.apiUrl = builder.base_url;
         this.model = builder.modelName;
@@ -46,7 +46,7 @@ public class OllamaModel implements FormatterInterface {
 
     @Override
     public HashMap<String, String> getHeaders() {
-        return null;
+        return headers;
     }
 
     public boolean isStream() {
@@ -146,7 +146,7 @@ public class OllamaModel implements FormatterInterface {
 
     public static class Builder {
 
-        private String base_url = "http://localhost:11434";
+        private String base_url = "";
         private String modelName;
         private boolean isStream = false;
 
@@ -186,7 +186,7 @@ public class OllamaModel implements FormatterInterface {
 
 
 
-        public OllamaModel build() throws IllegalArgumentException{
+        public OpenAIFormatter build() throws IllegalArgumentException{
 
             if( modelName == null ) {
 
@@ -194,7 +194,7 @@ public class OllamaModel implements FormatterInterface {
 
             }
 
-            return new OllamaModel( this );
+            return new OpenAIFormatter( this );
 
 
         }
