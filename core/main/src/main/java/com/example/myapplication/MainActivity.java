@@ -65,6 +65,7 @@ import org.mobchain.memory.BuiltInMemory;
 import org.mobchain.memory.InMemory;
 import org.mobchain.messages.HumanMessages;
 import org.mobchain.messages.SystemMessages;
+import org.mobchain.models.BuiltInFormatters;
 import org.mobchain.models.ModelInterface;
 
 import org.mobchain.skills.SkillsScanner;
@@ -495,22 +496,34 @@ public class MainActivity extends AppCompatActivity {
                     "only look for other tools.IMPORTANT : MOSTLY TRY TO SPAWN AGENT WITH SPECILIZED SKILL."));
 
             ModelPluginWithFormatterPath defaultModel = db.modelPluginDao().getModelPluginWithFormatterPath(modelPluginId);
-            if (defaultModel == null || defaultModel.getModelPlugin().formatterId == null) {
-                System.out.println("Model plugin or formatter not found for pluginId: " + modelPluginId);
+            if (defaultModel == null) {
+                System.out.println("Model plugin not found for pluginId: " + modelPluginId);
                 return;
             }
 
+            // formatterId == null means the user chose the built-in formatter (stored as null
+            // in DB to avoid FK violation). Resolve: null → BuiltInFormatters.OPENAI_FORMATTER_ID.
+            int formatterId = (defaultModel.getModelPlugin().formatterId != null)
+                    ? defaultModel.getModelPlugin().formatterId
+                    : BuiltInFormatters.OPENAI_FORMATTER_ID;
+
             DexLoader dexLoader = new DexLoader(this);
-            FormatterBuilder formatterBuilder = dexLoader.loadFormatter(defaultModel.getModelPlugin().formatterId);
+            FormatterBuilder formatterBuilder = dexLoader.loadFormatter(formatterId);
             if (formatterBuilder == null) {
                 System.out.println("Failed to load formatter plugin");
                 return;
             }
 
-            FormatterInterface formatterInterface = formatterBuilder
+            // Load config headers from DB and apply to formatter builder
+            List<com.example.myapplication.DAOs.entities.ConfigHeader> configHeaders =
+                    db.configHeaderDao().getByConfigId(modelPluginId);
+            formatterBuilder
                     .baseURL(defaultModel.getModelPlugin().getApiUrl())
-                    .model(defaultModel.getModelPlugin().getModelName())
-                    .build();
+                    .model(defaultModel.getModelPlugin().getModelName());
+            for (com.example.myapplication.DAOs.entities.ConfigHeader h : configHeaders) {
+                formatterBuilder.addHeader(h.getHeaderKey(), h.getHeaderValue());
+            }
+            FormatterInterface formatterInterface = formatterBuilder.build();
 
             agent = new ModelInterface.Builder()
                     .setModel(formatterInterface)

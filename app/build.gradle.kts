@@ -69,12 +69,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
-            resValue("string","app_name","ReTerminal")
+            resValue("string","app_name","mobAgent")
         }
         debug{
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-DEBUG"
-            resValue("string","app_name","ReTerminal-Debug")
+            resValue("string","app_name","mobAgent-Debug")
         }
     }
 

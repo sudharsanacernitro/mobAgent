@@ -30,7 +30,7 @@ public interface ModelPluginDao {
     @Query("SELECT mp.*, p.name AS plugin_name FROM model_plugin mp INNER JOIN plugins p ON mp.plugin_id = p.id")
     List<ModelPluginWithPluginName> getAllWithPluginName();
 
-    @Query("SELECT mp.*, p.Path AS formtter_path FROM model_plugin mp INNER JOIN plugins p ON mp.formatter_id = p.id WHERE mp.plugin_id = :modelPluginId")
+    @Query("SELECT mp.*, p.Path AS formatter_path FROM model_plugin mp LEFT JOIN plugins p ON mp.formatter_id = p.id WHERE mp.plugin_id = :modelPluginId")
     ModelPluginWithFormatterPath getModelPluginWithFormatterPath(int modelPluginId);
 
     @Query("SELECT * FROM model_plugin WHERE plugin_id = :pluginId")

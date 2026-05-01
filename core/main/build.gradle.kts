@@ -95,6 +95,7 @@ dependencies {
     api(libs.accompanist.systemuicontroller)
     //implementation(libs.androidx.room.common.jvm)
     implementation(libs.androidx.room.runtime)
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     annotationProcessor(libs.androidx.room.compiler)
     api("org.mobAgent:mobAgentInterfaces:1.0.0")
 

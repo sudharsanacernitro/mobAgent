@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import okhttp3.logging.HttpLoggingInterceptor;
 
 public class Request {
 
@@ -20,11 +21,16 @@ public class Request {
             Map<String, String> headers   // ✅ added
     ) throws Exception {
 
+        HttpLoggingInterceptor logging = new HttpLoggingInterceptor();
+        logging.setLevel(HttpLoggingInterceptor.Level.BODY);
+
         OkHttpClient client = new OkHttpClient.Builder()
                 .connectTimeout(60, TimeUnit.SECONDS)
                 .readTimeout(120, TimeUnit.SECONDS)
                 .writeTimeout(60, TimeUnit.SECONDS)
+                .addInterceptor(logging)
                 .build();
+
 
         RequestBody body = RequestBody.create(
                 jsonBody.toString(),

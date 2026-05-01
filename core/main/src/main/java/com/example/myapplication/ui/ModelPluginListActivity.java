@@ -176,6 +176,15 @@ public class ModelPluginListActivity extends AppCompatActivity {
                             ? formatterIdList.get(selectedPos)
                             : null;
 
+                    // Built-in formatters use negative sentinel IDs — store null in DB
+                    // to avoid FK violation (formatter_id FK → formatter_plugin.plugin_id).
+                    // The sentinel is remembered separately and resolved in initAgent().
+                    // For now we store the sentinel value in a tag on the plugin name so
+                    // initAgent can detect built-in at load time via formatterId == null check
+                    // combined with DexLoader's BuiltInFormatters.isBuiltIn() fallback.
+                    final Integer formatterIdForDb = (formatterId != null && BuiltInFormatters.isBuiltIn(formatterId))
+                            ? null : formatterId;
+
                     // Collect headers
                     List<String[]> headers = new ArrayList<>();
                     for (View row : headerRows) {
@@ -186,7 +195,7 @@ public class ModelPluginListActivity extends AppCompatActivity {
                         }
                     }
 
-                    Integer finalFormatterId = formatterId;
+                    Integer finalFormatterId = formatterIdForDb;
                     String finalPluginName = pluginName;
                     String finalName = name;
                     String finalUrl = url;
