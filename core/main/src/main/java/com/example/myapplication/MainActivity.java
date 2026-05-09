@@ -4,18 +4,29 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
+import android.graphics.Typeface;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ScrollView;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -29,8 +40,11 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
@@ -59,7 +73,6 @@ import com.example.myapplication.ui.adapter.ChatMessageAdapter;
 import org.json.JSONObject;
 import org.mobAgent.plugin.interfaces.FormatterBuilder;
 import org.mobAgent.plugin.interfaces.FormatterInterface;
-
 import org.mobAgent.plugin.interfaces.Memory;
 import org.mobchain.memory.BuiltInMemory;
 import org.mobchain.memory.InMemory;
@@ -67,7 +80,6 @@ import org.mobchain.messages.HumanMessages;
 import org.mobchain.messages.SystemMessages;
 import org.mobchain.models.BuiltInFormatters;
 import org.mobchain.models.ModelInterface;
-
 import org.mobchain.skills.SkillsScanner;
 import org.mobchain.tools.OwnTools.NativeTools.SpawnAgentTool;
 import org.mobchain.tools.ToolsManager;
@@ -81,26 +93,39 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity {
     private final CountDownLatch serverReady = new CountDownLatch(1);
 
-    private  ModelInterface agent = null;
+    private ModelInterface agent = null;
     private volatile boolean alpineReady = false;
 
+    // ── Text-mode views ──────────────────────────────────────────────────
     EditText inputText;
     ImageButton checkServerStatus;
     Button sendMsg;
-
     ImageButton manageSettings;
-
     ImageButton btnSessions;
+    View inputBar;
+
+    // ── Speech-mode views ────────────────────────────────────────────────
+    View speechPanel;
+    TextView speechStatus;
+    ImageButton btnMic;
+    ImageButton btnToggleSpeech;
+
+    // ── Speech mode state ────────────────────────────────────────────────
+    private boolean isSpeechMode = false;
+    private TextToSpeech tts;
+    private SpeechRecognizer speechRecognizer;
+    private static final int REQUEST_RECORD_AUDIO = 101;
+
+    // ── Session / chat ───────────────────────────────────────────────────
     private int currentSessionId = -1;
     private ActivityResultLauncher<Intent> sessionPickerLauncher;
-
     RecyclerView recyclerChat;
     ChatMessageAdapter chatAdapter;
     java.util.List<ChatMessageAdapter.ChatMsg> chatMessages = new java.util.ArrayList<>();
 
     private static Context context;
 
-     public static Context getAppContext() {
+    public static Context getAppContext() {
         return MainActivity.context;
     }
 
@@ -108,19 +133,24 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
-         context = getApplicationContext();
+        context = getApplicationContext();
 
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-
-        inputText = findViewById(R.id.msg);
-        sendMsg = findViewById(R.id.sendMsg);
+        // ── Find views ───────────────────────────────────────────────────
+        inputText        = findViewById(R.id.msg);
+        sendMsg          = findViewById(R.id.sendMsg);
         checkServerStatus = findViewById(R.id.checkServerStatus);
-        manageSettings = findViewById(R.id.manageSettings);
-        btnSessions = findViewById(R.id.btnSessions);
+        manageSettings   = findViewById(R.id.manageSettings);
+        btnSessions      = findViewById(R.id.btnSessions);
+        inputBar         = findViewById(R.id.inputBar);
+        speechPanel      = findViewById(R.id.speechPanel);
+        speechStatus     = findViewById(R.id.speechStatus);
+        btnMic           = findViewById(R.id.btnMic);
+        btnToggleSpeech  = findViewById(R.id.btnToggleSpeech);
 
-        // Session picker launcher
+        // ── Session picker ───────────────────────────────────────────────
         sessionPickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -138,13 +168,15 @@ public class MainActivity extends AppCompatActivity {
         btnSessions.setOnClickListener(v ->
                 sessionPickerLauncher.launch(new Intent(this, ChatSessionListActivity.class)));
 
+        // ── RecyclerView ─────────────────────────────────────────────────
         recyclerChat = findViewById(R.id.recyclerChat);
-        chatAdapter = new ChatMessageAdapter(chatMessages);
+        chatAdapter  = new ChatMessageAdapter(chatMessages);
         LinearLayoutManager lm = new LinearLayoutManager(this);
         lm.setStackFromEnd(true);
         recyclerChat.setLayoutManager(lm);
         recyclerChat.setAdapter(chatAdapter);
 
+        // ── LlamaCpp status ──────────────────────────────────────────────
         LlamaCppServerRepo llamaCppServerRepo = new LlamaCppServerRepo(this);
         int port = Integer.parseInt(PropertiesReader.getProperty(this, "LlamaServerport"));
 
@@ -159,114 +191,146 @@ public class MainActivity extends AppCompatActivity {
             }).start();
         });
 
+        // ── Send button (text mode) ──────────────────────────────────────
+        sendMsg.setOnClickListener(v -> {
+            String text = inputText.getText().toString().trim();
+            if (text.isEmpty()) return;
+            inputText.setText("");
+            sendMessage(text);
+        });
 
-        sendMsg.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
+        // ── Speech toggle ────────────────────────────────────────────────
+        btnToggleSpeech.setOnClickListener(v -> toggleSpeechMode());
 
-                String inputToLlm = inputText.getText().toString();
-                inputText.setText("");
-
-                // Add user message to chat UI
-                chatAdapter.addMessage(new ChatMessageAdapter.ChatMsg("You", inputToLlm));
-                recyclerChat.scrollToPosition(chatMessages.size() - 1);
-
-                // Save user message to DB
-                if (currentSessionId != -1) {
-                    Executors.newSingleThreadExecutor().execute(() -> {
-                        ChatMessageStore store = new ChatMessageStore(MainActivity.this, currentSessionId);
-                        store.saveHumanMessage(inputToLlm);
-                    });
-                }
-
-                if( agent == null ) {
-
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            new AlertDialog.Builder(MainActivity.this)
-                                    .setTitle("Popup Title")
-                                    .setMessage("Default agent is not initialized")
-                                    .setPositiveButton("OK", null)
-                                    .show();
-                        }
-                    });
-
-                    return;
-                }
-
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-
-                        String output = agent.chat(new HumanMessages(inputToLlm));
-
-                        // Save AI message to DB
-                        if (currentSessionId != -1) {
-                            ChatMessageStore store = new ChatMessageStore(MainActivity.this, currentSessionId);
-                            store.saveAiMessage(output);
-                        }
-
-                        runOnUiThread(() -> {
-                            chatAdapter.addMessage(new ChatMessageAdapter.ChatMsg("AI", output));
-                            recyclerChat.scrollToPosition(chatMessages.size() - 1);
-                        });
-
-                        System.out.println("Button clicked! : " + output);
-                    }
-                }).start();
-
+        // ── Mic button ───────────────────────────────────────────────────
+        btnMic.setOnClickListener(v -> {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                    == PackageManager.PERMISSION_GRANTED) {
+                startListening();
+            } else {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_RECORD_AUDIO);
             }
         });
 
+        // ── TextToSpeech init ────────────────────────────────────────────
+        tts = new TextToSpeech(this, status -> {
+            if (status == TextToSpeech.SUCCESS) {
+                tts.setLanguage(Locale.US);
+                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                    @Override public void onStart(String id) {}
+                    @Override public void onDone(String id) {
+                        if (isSpeechMode) setSpeechStatus("Tap mic to speak");
+                    }
+                    @Override public void onError(String id) {
+                        if (isSpeechMode) setSpeechStatus("Tap mic to speak");
+                    }
+                });
+            }
+        });
+
+        // ── Settings ─────────────────────────────────────────────────────
         manageSettings.setOnClickListener(v ->
                 startActivity(new Intent(MainActivity.this, SettingsActivity.class)));
 
-
-
-
         TerminalLogger.init(this);
 
-        // Auto-create a new session on every app launch and show plugin selection dialog
-        autoCreateSessionAndShowDialog();
+        // ── Alpine setup dialog (first-run only) ─────────────────────────
+        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+        boolean isFirstRun = prefs.getBoolean("is_first_run", true);
+
+        // Dialog refs — valid only when isFirstRun
+        final AlertDialog[] dialogRef  = {null};
+        final TextView[]    logViewRef = {null};
+        final ScrollView[]  scrollRef  = {null};
+
+        if (isFirstRun) {
+            // We are on the UI thread inside onCreate — create dialog directly
+            TextView logView = new TextView(this);
+            logView.setTypeface(Typeface.MONOSPACE);
+            logView.setTextSize(11f);
+            logView.setPadding(24, 16, 24, 16);
+
+            ScrollView scrollView = new ScrollView(this);
+            scrollView.addView(logView);
+
+            AlertDialog dialog = new AlertDialog.Builder(this)
+                    .setTitle("🚀 Setting up Alpine…")
+                    .setView(scrollView)
+                    .setCancelable(false)
+                    .setPositiveButton("Done", null)
+                    .create();
+            dialog.show();
+
+            // Force a small fixed window height (200 dp)
+            if (dialog.getWindow() != null) {
+                int widthPx = android.view.WindowManager.LayoutParams.MATCH_PARENT;
+                int heightPx = (int) (200 * getResources().getDisplayMetrics().density);
+                dialog.getWindow().setLayout(widthPx, heightPx);
+            }
+
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+
+            dialogRef[0]  = dialog;
+            logViewRef[0] = logView;
+            scrollRef[0]  = scrollView;
+        }
+
+        // Unified log callback — appends to dialog AND logcat
+        Consumer<String> logCallback = line -> {
+            System.out.println("[Alpine] " + line);
+            runOnUiThread(() -> {
+                TextView lv = logViewRef[0];
+                ScrollView sv = scrollRef[0];
+                if (lv != null) {
+                    lv.append(line + "\n");
+                    if (sv != null) sv.post(() -> sv.fullScroll(View.FOCUS_DOWN));
+                }
+            });
+        };
+
+        // Track last-reported download percentage to avoid flooding the log
+        final AtomicInteger lastPct = new AtomicInteger(-1);
 
         AlpineWrapper.setupAlpineAsync(
 
-                // onProgress
+                // onProgress — called per downloaded chunk on a background thread
                 (Function1<Float, Unit>) progress -> {
-                    System.out.println("Download progress: " + (int)(progress * 100) + "%");
+                    int pct = (int)(progress * 100);
+                    if (pct != lastPct.getAndSet(pct)) {
+                        logCallback.accept("📥 Downloading Alpine binaries… " + pct + "%");
+                    }
                     return Unit.INSTANCE;
                 },
 
                 // onComplete
                 (Function0<Unit>) () -> {
 
-                    System.out.println("port: "+Integer.parseInt(PropertiesReader.getProperty( this , "LlamaServerport" )));
+                    logCallback.accept("✓ Download complete.");
+                    System.out.println("port: " + Integer.parseInt(
+                            PropertiesReader.getProperty(this, "LlamaServerport")));
 
-                    initiateTerminalEmulator();
+                    initiateTerminalEmulator(logCallback);
 
-
-                    //initializing sessions
+                    // Initializing sessions
                     TerminalSessionManager.getInstance(this);
 
-                    //starting llama cpp server session
-//                    llamaCppServerRepo.runServer(port,"model");
-
-
-
-                    //adding Native public tools
+                    // Adding native public tools
                     ToolsManager.addTools("root", new SpawnAgentTool());
 
-                    //scanning public tools
-                    ToolsScanner toolsScanner = new ToolsScanner(new File(this.getDataDir(), "local/alpine/root/tools"));
+                    // Scanning public tools
+                    ToolsScanner toolsScanner = new ToolsScanner(
+                            new File(this.getDataDir(), "local/alpine/root/tools"));
                     toolsScanner.scanAndRegister();
 
-                    //scanning skills
-                    SkillsScanner skillsScanner = new SkillsScanner(new File(this.getDataDir(), "local/alpine/root/skills"));
+                    // Scanning skills
+                    SkillsScanner skillsScanner = new SkillsScanner(
+                            new File(this.getDataDir(), "local/alpine/root/skills"));
                     skillsScanner.scanAndRegister();
 
-                    System.out.println( ToolsManager.getToolsCountBySkill("web-crawler") );
-                    System.out.println( ToolsManager.getToolsCountBySkill("root") );
+                    logCallback.accept("✓ Tools and skills loaded.");
+                    System.out.println(ToolsManager.getToolsCountBySkill("web-crawler"));
+                    System.out.println(ToolsManager.getToolsCountBySkill("root"));
 
                     alpineReady = true;
 
@@ -275,13 +339,32 @@ public class MainActivity extends AppCompatActivity {
                         reinitAgentForSession(currentSessionId);
                     }
 
+                    // ── Dismiss dialog ────────────────────────────────────
+                    runOnUiThread(() -> {
+                        AlertDialog d = dialogRef[0];
+                        if (d != null && d.isShowing()) {
+                            d.setTitle("✅ Alpine Ready!");
+                            Button doneBtn = d.getButton(AlertDialog.BUTTON_POSITIVE);
+                            doneBtn.setEnabled(true);
+                            // Auto-dismiss after 1.5 s so user can read the final log
+                            doneBtn.postDelayed(d::dismiss, 1500);
+                        }
+                    });
 
                     return Unit.INSTANCE;
                 },
 
                 // onError
                 (Function1<Exception, Unit>) e -> {
+                    logCallback.accept("❌ Setup failed: " + e.getMessage());
                     System.out.println("Setup failed: " + e);
+                    runOnUiThread(() -> {
+                        AlertDialog d = dialogRef[0];
+                        if (d != null && d.isShowing()) {
+                            d.setTitle("❌ Setup Failed");
+                            d.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                        }
+                    });
                     return Unit.INSTANCE;
                 }
         );
@@ -290,8 +373,167 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Shared message-sending logic (text mode + speech mode both use this)
+    // ─────────────────────────────────────────────────────────────────────
+    private void sendMessage(String text) {
+        if (text == null || text.trim().isEmpty()) return;
 
+        if( currentSessionId == -1 ) {
+            autoCreateSessionAndShowDialog();
+            return;
+        }
 
+        // Show in chat
+        chatAdapter.addMessage(new ChatMessageAdapter.ChatMsg("You", text));
+        recyclerChat.scrollToPosition(chatMessages.size() - 1);
+
+        // Persist user message
+        if (currentSessionId != -1) {
+            Executors.newSingleThreadExecutor().execute(() -> {
+                ChatMessageStore store = new ChatMessageStore(MainActivity.this, currentSessionId);
+                store.saveHumanMessage(text);
+            });
+        }
+
+        if (agent == null) {
+            runOnUiThread(() -> new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("Not Ready")
+                    .setMessage("Default agent is not initialized")
+                    .setPositiveButton("OK", null)
+                    .show());
+            return;
+        }
+
+        if (isSpeechMode) setSpeechStatus("Thinking...");
+
+        new Thread(() -> {
+            String output = agent.chat(new HumanMessages(text));
+
+            // Persist AI message
+            if (currentSessionId != -1) {
+                ChatMessageStore store = new ChatMessageStore(MainActivity.this, currentSessionId);
+                store.saveAiMessage(output);
+            }
+
+            runOnUiThread(() -> {
+                chatAdapter.addMessage(new ChatMessageAdapter.ChatMsg("AI", output));
+                recyclerChat.scrollToPosition(chatMessages.size() - 1);
+            });
+
+            // Speak the response in speech mode
+            if (isSpeechMode && tts != null) {
+                setSpeechStatus("Speaking...");
+                tts.speak(output, TextToSpeech.QUEUE_FLUSH, null,
+                        "RESPONSE_" + System.currentTimeMillis());
+            }
+
+            System.out.println("Agent response: " + output);
+        }).start();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Speech mode toggle
+    // ─────────────────────────────────────────────────────────────────────
+    private void toggleSpeechMode() {
+        isSpeechMode = !isSpeechMode;
+        if (isSpeechMode) {
+            inputBar.setVisibility(View.GONE);
+            speechPanel.setVisibility(View.VISIBLE);
+            btnToggleSpeech.setImageResource(R.drawable.ic_keyboard);
+            setSpeechStatus("Tap mic to speak");
+        } else {
+            speechPanel.setVisibility(View.GONE);
+            inputBar.setVisibility(View.VISIBLE);
+            btnToggleSpeech.setImageResource(R.drawable.ic_mic);
+            if (speechRecognizer != null) speechRecognizer.stopListening();
+            if (tts != null) tts.stop();
+            setSpeechStatus("Tap mic to speak");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Speech recognizer
+    // ─────────────────────────────────────────────────────────────────────
+    private void startListening() {
+        if (speechRecognizer == null) {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+            speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                @Override
+                public void onReadyForSpeech(Bundle params) {
+                    setSpeechStatus("Listening...");
+                    runOnUiThread(() -> btnMic.setBackgroundResource(R.drawable.mic_button_bg_active));
+                }
+                @Override public void onBeginningOfSpeech() {}
+                @Override public void onRmsChanged(float rmsdB) {}
+                @Override public void onBufferReceived(byte[] buffer) {}
+                @Override
+                public void onEndOfSpeech() {
+                    setSpeechStatus("Processing...");
+                    runOnUiThread(() -> btnMic.setBackgroundResource(R.drawable.mic_button_bg));
+                }
+                @Override
+                public void onError(int error) {
+                    setSpeechStatus("Tap mic to speak");
+                    runOnUiThread(() -> btnMic.setBackgroundResource(R.drawable.mic_button_bg));
+                }
+                @Override
+                public void onResults(Bundle results) {
+                    ArrayList<String> matches =
+                            results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                    if (matches != null && !matches.isEmpty()) {
+                        runOnUiThread(() -> sendMessage(matches.get(0)));
+                    } else {
+                        setSpeechStatus("Tap mic to speak");
+                    }
+                }
+                @Override public void onPartialResults(Bundle partialResults) {}
+                @Override public void onEvent(int eventType, Bundle params) {}
+            });
+        }
+
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
+        speechRecognizer.startListening(intent);
+        setSpeechStatus("Listening...");
+    }
+
+    private void setSpeechStatus(String status) {
+        runOnUiThread(() -> speechStatus.setText(status));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Runtime permission result
+    // ─────────────────────────────────────────────────────────────────────
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_RECORD_AUDIO) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startListening();
+            } else {
+                Toast.makeText(this, "Microphone permission required for speech mode",
+                        Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Lifecycle
+    // ─────────────────────────────────────────────────────────────────────
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (tts != null) { tts.stop(); tts.shutdown(); tts = null; }
+        if (speechRecognizer != null) { speechRecognizer.destroy(); speechRecognizer = null; }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Session helpers (unchanged)
+    // ─────────────────────────────────────────────────────────────────────
     private void loadSessionChat(int sessionId) {
         Executors.newSingleThreadExecutor().execute(() -> {
             PluginDatabase db = PluginDatabase.getInstance(this);
@@ -320,9 +562,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * Auto-creates a new chat session and shows the plugin selection dialog.
-     */
     private void autoCreateSessionAndShowDialog() {
         Executors.newSingleThreadExecutor().execute(() -> {
             PluginDatabase db = PluginDatabase.getInstance(this);
@@ -347,9 +586,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * Shows a dialog for the user to select model and memory plugins for the current session.
-     */
     private void showPluginSelectionDialog() {
         Executors.newSingleThreadExecutor().execute(() -> {
             PluginDatabase db = PluginDatabase.getInstance(this);
@@ -387,12 +623,12 @@ public class MainActivity extends AppCompatActivity {
     private void buildPluginSelectionDialog(List<String> modelNames, List<Integer> modelIds,
                                              List<String> memoryNames, List<Integer> memoryIds) {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_select_plugins, null);
-        Spinner spinnerModel = dialogView.findViewById(R.id.spinnerModelPlugin);
+        Spinner spinnerModel  = dialogView.findViewById(R.id.spinnerModelPlugin);
         Spinner spinnerMemory = dialogView.findViewById(R.id.spinnerMemoryPlugin);
-        Button btnSettings = dialogView.findViewById(R.id.btnGoToSettings);
+        Button btnSettings    = dialogView.findViewById(R.id.btnGoToSettings);
 
-        List<String> displayModelNames = new ArrayList<>(modelNames);
-        List<Integer> displayModelIds = new ArrayList<>(modelIds);
+        List<String>  displayModelNames = new ArrayList<>(modelNames);
+        List<Integer> displayModelIds   = new ArrayList<>(modelIds);
         if (displayModelNames.isEmpty()) {
             displayModelNames.add("No model plugins — add in Settings");
             displayModelIds.add(-1);
@@ -413,10 +649,10 @@ public class MainActivity extends AppCompatActivity {
                 .setView(dialogView)
                 .setCancelable(false)
                 .setPositiveButton("Confirm", (d, which) -> {
-                    int modelPos = spinnerModel.getSelectedItemPosition();
+                    int modelPos  = spinnerModel.getSelectedItemPosition();
                     int memoryPos = spinnerMemory.getSelectedItemPosition();
 
-                    int selectedModelId = displayModelIds.get(modelPos);
+                    int selectedModelId    = displayModelIds.get(modelPos);
                     Integer selectedMemoryId = memoryIds.get(memoryPos);
 
                     if (selectedModelId == -1) {
@@ -426,7 +662,7 @@ public class MainActivity extends AppCompatActivity {
 
                     // Store null in DB for built-in memory (FK constraint),
                     // but pass the sentinel ID to initAgent so it resolves correctly.
-                    Integer memoryIdForDb = (selectedMemoryId != null && BuiltInMemory.isBuiltIn(selectedMemoryId))
+                    Integer memoryIdForDb    = (selectedMemoryId != null && BuiltInMemory.isBuiltIn(selectedMemoryId))
                             ? null : selectedMemoryId;
                     Integer memoryIdForAgent = selectedMemoryId;
 
@@ -537,193 +773,71 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void initiateTerminalEmulator()  {
+    private void initiateTerminalEmulator(Consumer<String> logCallback) {
 
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
-
         boolean isFirstRun = prefs.getBoolean("is_first_run", true);
 
         TerminalSynchronousSessionHandler headlessSession =
-                (TerminalSynchronousSessionHandler) MkSession.INSTANCE.createSession( this, "1", 0 , 0);
+                (TerminalSynchronousSessionHandler) MkSession.INSTANCE.createSession(this, "1", 0, 0);
 
         if (isFirstRun) {
-
-            headlessSession.initializeAlpine();
+            logCallback.accept("Starting Alpine environment…");
+            headlessSession.initializeAlpine(logCallback);
 
             try {
                 moveSetupFiles();
+                logCallback.accept("✓ Setup files copied.");
             } catch (IOException e) {
+                logCallback.accept("⚠ Setup files error: " + e.getMessage());
                 System.out.println("Error moving setup files: " + e.getMessage());
             }
 
             System.out.println("TerminalInitiated");
-
             prefs.edit().putBoolean("is_first_run", false).apply();
+        }
+    }
 
+    private boolean moveSetupFiles() throws IOException {
+
+        List<String> fileNames = Arrays.asList("llamaCppServerSetup.sh", "sshServerSetup.sh", "ToolsWrapper.sh");
+
+        for (String assetName : fileNames) {
+
+            String rootDirPath = PropertiesReader.getProperty(context, "rootDirFromLocalDir");
+            File destinationFile = new File(rootDirPath + assetName);
+
+            if (destinationFile.exists()) {
+                System.out.println("File already exists locally. Skipping copy.");
+                return true;
+            }
+
+            String setupFilePath = rootDirPath + assetName;
+
+            for (String file : context.getAssets().list("")) {
+                System.out.println(file + " equals: " + file.equals(assetName));
+            }
+
+            try (InputStream in = context.getAssets().open(assetName)) {
+                try (OutputStream out = new FileOutputStream(setupFilePath)) {
+                    byte[] buffer = new byte[8192];
+                    int read;
+                    while ((read = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, read);
+                    }
+                    out.flush();
+                    System.out.println("Asset copied successfully.");
+                } catch (Exception e) {
+                    System.out.println("destination folder error: " + e.getMessage());
+                    return false;
+                }
+            } catch (IOException e) {
+                System.out.println("Asset not found ");
+                e.printStackTrace();
+                return false;
+            }
         }
 
+        return true;
     }
-
-    private boolean moveSetupFiles( ) throws IOException {
-
-         List<String> fileNames = Arrays.asList("llamaCppServerSetup.sh","sshServerSetup.sh","ToolsWrapper.sh");
-
-         for( String assetName : fileNames) {
-
-             String rootDirPath = PropertiesReader.getProperty(context, "rootDirFromLocalDir");
-
-             File destinationFile = new File(rootDirPath + assetName);
-
-             // If already exists locally, skip copying
-             if (destinationFile.exists()) {
-                 System.out.println("File already exists locally. Skipping copy.");
-                 return true;
-             }
-
-             String setupFilePath = rootDirPath + assetName;
-
-             for (String file : context.getAssets().list("")) {
-                 System.out.println(file + " equals: " + file.equals(assetName));
-             }
-
-             try (InputStream in = context.getAssets().open(assetName)) {
-                 try (OutputStream out = new FileOutputStream(setupFilePath)) {
-
-                     byte[] buffer = new byte[8192];
-                     int read;
-
-                     while ((read = in.read(buffer)) != -1) {
-                         out.write(buffer, 0, read);
-                     }
-
-                     out.flush();
-
-                     System.out.println("Asset copied successfully.");
-
-                 } catch (Exception e) {
-                     System.out.println("destination folder error: " + e.getMessage());
-                     return false;
-                 }
-
-
-
-             } catch (IOException e) {
-
-                 System.out.println("Asset not found ");
-                 e.printStackTrace();
-                 return false;
-
-             }
-         }
-
-         return true;
-
-    }
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-//
-//
-//
-//package com.example.myapplication;
-//
-//import android.os.Bundle;
-//import android.util.Log;
-//
-//import androidx.appcompat.app.AppCompatActivity;
-//
-//import java.io.File;
-//import java.io.FileOutputStream;
-//import java.io.InputStream;
-//import java.lang.reflect.Method;
-//
-//import dalvik.system.DexClassLoader;
-//
-//public class MainActivity extends AppCompatActivity {
-//
-//    private static final String TAG = "DEX_TEST";
-//
-//    @Override
-//    protected void onCreate(Bundle savedInstanceState) {
-//        super.onCreate(savedInstanceState);
-//
-//        try {
-//            // 1️⃣ Copy plugin.jar to internal storage
-//            File pluginJar = copyPluginFromAssets("plugin.jar");
-//
-//            // 2️⃣ Load plugin
-//            runPlugin(pluginJar);
-//
-//        } catch (Exception e) {
-//            Log.e(TAG, "Error running plugin", e);
-//        }
-//    }
-//
-//    // -------------------------------
-//    // Copy plugin.jar into app storage
-//    // -------------------------------
-//    private File copyPluginFromAssets(String assetName) throws Exception {
-//        File outFile = new File(getFilesDir(), assetName);
-//
-//        if (outFile.exists()) {
-//            return outFile; // already copied
-//        }
-//
-//        InputStream is = getAssets().open(assetName);
-//        FileOutputStream fos = new FileOutputStream(outFile);
-//
-//        byte[] buffer = new byte[4096];
-//        int read;
-//        while ((read = is.read(buffer)) != -1) {
-//            fos.write(buffer, 0, read);
-//        }
-//
-//        is.close();
-//        fos.close();
-//
-//        return outFile;
-//    }
-//
-//    // -------------------------------
-//    // Load & execute class from DEX
-//    // -------------------------------
-//    private void runPlugin(File pluginJar) throws Exception {
-//
-//        File optimizedDir = getDir("dex_opt", MODE_PRIVATE);
-//
-//        DexClassLoader classLoader = new DexClassLoader(
-//                pluginJar.getAbsolutePath(),
-//                optimizedDir.getAbsolutePath(),
-//                null,
-//                getClassLoader()
-//        );
-//
-//        // 1️⃣ Load class
-//        Class<?> clazz = classLoader.loadClass("org.example.Main");
-//
-//        // 2️⃣ Create instance (because method is NOT static)
-//        Object instance = clazz.getDeclaredConstructor().newInstance();
-//
-//        // 3️⃣ Get method with parameter type
-//        Method method = clazz.getMethod("Execute", String.class);
-//
-//        // 4️⃣ Invoke with instance + argument
-//        String result = (String) method.invoke(instance, "Executed Successfully");
-//
-//        Log.d(TAG, "Plugin result: " + result);
-//    }
-//
-//}
-//

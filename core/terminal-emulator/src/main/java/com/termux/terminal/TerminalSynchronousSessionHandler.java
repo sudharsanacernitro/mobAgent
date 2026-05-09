@@ -9,6 +9,7 @@ import java.io.*;
 import java.lang.reflect.Field;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 public final class TerminalSynchronousSessionHandler implements TerminalSessionHandler {
 
@@ -57,7 +58,18 @@ public final class TerminalSynchronousSessionHandler implements TerminalSessionH
     // ============================================================
     // Alpine initialization (legacy / simple mode)
     // ============================================================
+
+    /** Convenience overload — no log callback. */
     public void initializeAlpine() {
+        initializeAlpine(null);
+    }
+
+    /**
+     * Initializes Alpine synchronously.
+     * @param logListener optional callback invoked on the calling thread for each log line;
+     *                    pass {@code null} to skip.
+     */
+    public void initializeAlpine(Consumer<String> logListener) {
 
         int[] processId = new int[1];
 
@@ -70,7 +82,9 @@ public final class TerminalSynchronousSessionHandler implements TerminalSessionH
 
         final FileDescriptor fd = wrapFileDescriptor(mTerminalFileDescriptor);
 
-        Log.d("INIT", "Starting emulator initialization...");
+        String startMsg = "Starting Alpine initialization…";
+        Log.d("INIT", startMsg);
+        if (logListener != null) logListener.accept(startMsg);
 
         boolean isInitialized = false;
 
@@ -87,13 +101,18 @@ public final class TerminalSynchronousSessionHandler implements TerminalSessionH
                 if (read == -1) break;
 
                 String text = new String(buffer, 0, read);
-                String cleaned = text.replaceAll("\u001B\\[[;\\d]*[ -/]*[@-~]", "");
+                String cleaned = text.replaceAll("\u001B\\[[;\\d]*[ -/]*[@-~]", "").trim();
 
-                Log.d("INIT_LOG", cleaned);
+                if (!cleaned.isEmpty()) {
+                    Log.d("INIT_LOG", cleaned);
+                    if (logListener != null) logListener.accept(cleaned);
+                }
 
                 // Detect shell prompt
-                if (cleaned.trim().endsWith("#") || cleaned.trim().endsWith("$")) {
-                    Log.d("INIT", "Shell prompt detected, verifying...");
+                if (cleaned.endsWith("#") || cleaned.endsWith("$")) {
+                    String promptMsg = "Shell prompt detected — sending READY probe…";
+                    Log.d("INIT", promptMsg);
+                    if (logListener != null) logListener.accept(promptMsg);
                     termOut.write("echo READY\n".getBytes());
                     termOut.flush();
                 }
@@ -101,12 +120,16 @@ public final class TerminalSynchronousSessionHandler implements TerminalSessionH
                 // Final confirmation
                 if (cleaned.contains("READY")) {
                     isInitialized = true;
-                    Log.d("INIT", "Initialization COMPLETE");
+                    String doneMsg = "✓ Alpine initialization complete.";
+                    Log.d("INIT", doneMsg);
+                    if (logListener != null) logListener.accept(doneMsg);
                 }
             }
 
         } catch (Exception e) {
-            Log.e("INIT_ERROR", e.toString());
+            String errMsg = "Error during initialization: " + e;
+            Log.e("INIT_ERROR", errMsg);
+            if (logListener != null) logListener.accept(errMsg);
         }
     }
 

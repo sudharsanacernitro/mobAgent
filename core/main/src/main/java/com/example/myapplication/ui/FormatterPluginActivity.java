@@ -24,12 +24,14 @@ import com.example.myapplication.DAOs.PluginDatabase;
 import com.example.myapplication.DAOs.entities.FormatterPlugin;
 import com.example.myapplication.DAOs.entities.Plugin;
 import com.rk.terminal.R;
+import org.mobchain.models.BuiltInFormatters;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 
 /** Helper class to hold a FormatterPlugin together with its Plugin name */
@@ -156,13 +158,22 @@ public class FormatterPluginActivity extends AppCompatActivity {
     private void loadItems() {
         Executors.newSingleThreadExecutor().execute(() -> {
             PluginDatabase db = PluginDatabase.getInstance(this);
-            List<FormatterPlugin> all = db.formatterDao().getAll();
             List<FormatterWithName> loaded = new ArrayList<>();
+
+            // ── Built-in formatters (always present, not stored in DB) ─────
+            for (Map.Entry<Integer, String> entry : BuiltInFormatters.getAll().entrySet()) {
+                FormatterPlugin dummy = new FormatterPlugin(entry.getKey()); // sentinel ID (negative)
+                loaded.add(new FormatterWithName(dummy, entry.getValue()));
+            }
+
+            // ── User-uploaded formatter plugins from DB ────────────────────
+            List<FormatterPlugin> all = db.formatterDao().getAll();
             for (FormatterPlugin fp : all) {
                 Plugin p = db.pluginDao().getById(fp.getPluginId());
                 String name = (p != null) ? p.getName() : "Unknown";
                 loaded.add(new FormatterWithName(fp, name));
             }
+
             runOnUiThread(() -> {
                 items.clear();
                 items.addAll(loaded);
@@ -182,30 +193,36 @@ public class FormatterPluginActivity extends AppCompatActivity {
         public void onBindViewHolder(@NonNull VH holder, int position) {
             FormatterWithName item = items.get(position);
             holder.title.setText(item.pluginName);
-            holder.subtitle.setText("Plugin ID: " + item.pluginId);
-            holder.deleteBtn.setOnClickListener(v -> {
-                int pos = holder.getBindingAdapterPosition();
-                if (pos == RecyclerView.NO_POSITION) return;
-                FormatterWithName fwn = items.get(pos);
-                Executors.newSingleThreadExecutor().execute(() -> {
-                    PluginDatabase db = PluginDatabase.getInstance(FormatterPluginActivity.this);
-                    // Deleting the parent Plugin cascades to formatter_plugin
-                    Plugin p = db.pluginDao().getById(fwn.pluginId);
-                    if (p != null) {
-                        db.pluginDao().delete(p);
-                        // Also delete the jar file
-                        if (p.getPath() != null) {
-                            File jarFile = new File(p.getPath());
-                            jarFile.delete();
-                        }
-                    }
 
-                    runOnUiThread(() -> {
-                        items.remove(pos);
-                        notifyItemRemoved(pos);
+            boolean isBuiltIn = BuiltInFormatters.isBuiltIn(item.pluginId);
+            if (isBuiltIn) {
+                holder.subtitle.setText("Built-in · always available");
+                holder.deleteBtn.setVisibility(View.GONE);
+            } else {
+                holder.subtitle.setText("Plugin ID: " + item.pluginId);
+                holder.deleteBtn.setVisibility(View.VISIBLE);
+                holder.deleteBtn.setOnClickListener(v -> {
+                    int pos = holder.getBindingAdapterPosition();
+                    if (pos == RecyclerView.NO_POSITION) return;
+                    FormatterWithName fwn = items.get(pos);
+                    Executors.newSingleThreadExecutor().execute(() -> {
+                        PluginDatabase db = PluginDatabase.getInstance(FormatterPluginActivity.this);
+                        // Deleting the parent Plugin cascades to formatter_plugin
+                        Plugin p = db.pluginDao().getById(fwn.pluginId);
+                        if (p != null) {
+                            db.pluginDao().delete(p);
+                            // Also delete the jar file
+                            if (p.getPath() != null) {
+                                new File(p.getPath()).delete();
+                            }
+                        }
+                        runOnUiThread(() -> {
+                            items.remove(pos);
+                            notifyItemRemoved(pos);
+                        });
                     });
                 });
-            });
+            }
         }
 
         @Override public int getItemCount() { return items.size(); }

@@ -37,6 +37,17 @@
             android:textColor="#FFFFFF"
             android:gravity="center" />
 
+        <!-- Speech / Keyboard Toggle Button -->
+        <ImageButton
+            android:id="@+id/btnToggleSpeech"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_mic"
+            android:background="@drawable/icon_circle_bg"
+            android:contentDescription="Toggle Speech Mode"
+            android:padding="10dp"
+            app:tint="#FFFFFF" />
+
         <!-- Info Button -->
         <ImageButton
             android:id="@+id/checkServerStatus"
@@ -48,58 +59,94 @@
             android:padding="8dp"
             app:tint="#FFFFFF" />
 
-<!-- Manage Button -->
-<ImageButton
-    android:id="@+id/manageSettings"
-    android:layout_width="48dp"
-    android:layout_height="48dp"
-    android:src="@android:drawable/ic_menu_manage"
-    android:background="@drawable/icon_circle_bg"
-    android:contentDescription="Manage"
-    android:padding="8dp"
-    app:tint="#FFFFFF" />
-</LinearLayout>
+        <!-- Manage Button -->
+        <ImageButton
+            android:id="@+id/manageSettings"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@android:drawable/ic_menu_manage"
+            android:background="@drawable/icon_circle_bg"
+            android:contentDescription="Manage"
+            android:padding="8dp"
+            app:tint="#FFFFFF" />
+    </LinearLayout>
 
     <!-- Chat Messages -->
-<androidx.recyclerview.widget.RecyclerView
-    android:id="@+id/recyclerChat"
-    android:layout_width="match_parent"
-    android:layout_height="0dp"
-    android:layout_weight="1"
-    android:clipToPadding="false"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp"/>
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerChat"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"/>
 
-    <!-- Input Bar -->
-<LinearLayout
-android:layout_width="match_parent"
-android:layout_height="wrap_content"
-android:orientation="horizontal"
-android:background="#1E1E1E"
-    android:padding="8dp"
-    android:gravity="center_vertical">
+    <!-- Text Input Bar (default / text mode) -->
+    <LinearLayout
+        android:id="@+id/inputBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#1E1E1E"
+        android:padding="8dp"
+        android:gravity="center_vertical">
 
-<EditText
-android:id="@+id/msg"
-android:layout_width="0dp"
-android:layout_height="wrap_content"
-android:layout_weight="1"
-android:hint="Type a message"
-android:textColor="#FFFFFF"
-android:textColorHint="#AAAAAA"
-android:textSize="16sp"
-android:background="@android:color/transparent"
-android:padding="16dp"
-android:minHeight="52dp"/>
+        <EditText
+            android:id="@+id/msg"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Type a message"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#AAAAAA"
+            android:textSize="16sp"
+            android:background="@android:color/transparent"
+            android:padding="16dp"
+            android:minHeight="52dp"/>
 
-<Button
-android:id="@+id/sendMsg"
-android:layout_width="wrap_content"
-android:layout_height="wrap_content"
-android:text="Send"
-android:textColor="#FFFFFF"
-android:background="#333333"
-android:padding="12dp"/>
+        <Button
+            android:id="@+id/sendMsg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Send"
+            android:textColor="#FFFFFF"
+            android:background="#333333"
+            android:padding="12dp"/>
     </LinearLayout>
 
+    <!-- Speech Mode Panel (hidden by default) -->
+    <LinearLayout
+        android:id="@+id/speechPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="#1E1E1E"
+        android:paddingTop="20dp"
+        android:paddingBottom="20dp"
+        android:visibility="gone">
+
+        <!-- Status text (Tap mic to speak / Listening… / Thinking… / Speaking…) -->
+        <TextView
+            android:id="@+id/speechStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap mic to speak"
+            android:textColor="#AAAAAA"
+            android:textSize="14sp"
+            android:paddingBottom="16dp"/>
+
+        <!-- Big circular mic button -->
+        <ImageButton
+            android:id="@+id/btnMic"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@drawable/ic_mic"
+            android:background="@drawable/mic_button_bg"
+            android:contentDescription="Tap to speak"
+            android:padding="20dp"
+            app:tint="#FFFFFF"/>
+
     </LinearLayout>
+
+</LinearLayout>
