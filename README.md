@@ -182,4 +182,4 @@ Full docs in [`doc/`](./doc/README.md) — every class, entity, pattern, and flo
 
 ## Other
 
- I am looking for AI job.If you found this project interesting lets connect. Email : sudharsanr836@gmail.com
+If you found this project interesting lets connect. Email : sudharsanr836@gmail.com
