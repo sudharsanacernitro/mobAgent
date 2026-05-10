@@ -101,7 +101,7 @@ public class LlamaCppServerRepo {
 
             TerminalSynchronousSessionHandler headlessSession;
 
-            String CreateLlamaCppDircommand = "bash llamaCppServerSetup.sh "+dir+" http://100.118.114.83:8000/llama-server.zip";
+            String CreateLlamaCppDircommand = "bash llamaCppServerSetup.sh "+dir+" https://github.com/sudharsanacernitro/mobAgent/raw/master/llamaCppBinariesForAndroid.zip";
             
             headlessSession = (TerminalSynchronousSessionHandler) TerminalSessionManager.getInstance().getSession("temp_sync");
 
