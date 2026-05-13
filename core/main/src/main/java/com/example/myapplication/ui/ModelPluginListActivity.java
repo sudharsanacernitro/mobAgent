@@ -52,7 +52,14 @@ public class ModelPluginListActivity extends AppCompatActivity {
                 },
                 (position, item) -> {
                     Executors.newSingleThreadExecutor().execute(() -> {
-                        PluginDatabase.getInstance(this).modelPluginDao().delete(item.getModelPlugin());
+                        PluginDatabase db = PluginDatabase.getInstance(this);
+                        int pluginId = item.getModelPlugin().getPluginId();
+                        db.modelPluginDao().delete(item.getModelPlugin());
+                        // Also delete the parent Plugin row to free the unique name
+                        Plugin parentPlugin = db.pluginDao().getById(pluginId);
+                        if (parentPlugin != null) {
+                            db.pluginDao().delete(parentPlugin);
+                        }
                         runOnUiThread(() -> {
                             adapter.removeItem(position);
                             Toast.makeText(this, "Deleted", Toast.LENGTH_SHORT).show();

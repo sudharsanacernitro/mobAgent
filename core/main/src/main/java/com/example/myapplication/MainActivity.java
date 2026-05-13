@@ -727,6 +727,7 @@ public class MainActivity extends AppCompatActivity {
 
             memory.setSystemPrompt(new SystemMessages(
                     "you are a root agent able to spawn subagents with skills using the tool ***spawn_agent*** . " +
+                            "If the user asks about common question ,answer on your own without spawning agent/calling tools ."+
                     "subagents spawn with skills are specialized agent . At first search for suitable skill for the user input, " +
                     "if any skills match( relevent more than 50%) then you should spawn agent . If there is no suck skills then " +
                     "only look for other tools.IMPORTANT : MOSTLY TRY TO SPAWN AGENT WITH SPECILIZED SKILL."));
@@ -804,15 +805,18 @@ public class MainActivity extends AppCompatActivity {
 
         for (String assetName : fileNames) {
 
-            String rootDirPath = PropertiesReader.getProperty(context, "rootDirFromLocalDir");
-            File destinationFile = new File(rootDirPath + assetName);
+            String rootDirRelative = PropertiesReader.getProperty(context, "rootDirFromLocalDir");
+            File rootDir = new File(context.getDataDir(), rootDirRelative);
+            if (!rootDir.exists()) rootDir.mkdirs();
+
+            File destinationFile = new File(rootDir, assetName);
 
             if (destinationFile.exists()) {
                 System.out.println("File already exists locally. Skipping copy.");
                 return true;
             }
 
-            String setupFilePath = rootDirPath + assetName;
+            String setupFilePath = destinationFile.getAbsolutePath();
 
             for (String file : context.getAssets().list("")) {
                 System.out.println(file + " equals: " + file.equals(assetName));

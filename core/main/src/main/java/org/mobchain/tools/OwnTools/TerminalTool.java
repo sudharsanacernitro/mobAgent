@@ -57,7 +57,7 @@ public class TerminalTool implements Tool {
 
         TerminalSynchronousSessionHandler session = (TerminalSynchronousSessionHandler) terminalSessionManager.getSession("tools");
 
-        StringBuilder commandBuilder = new StringBuilder("/root/ToolsWrapper.sh ");
+        StringBuilder commandBuilder = new StringBuilder("sh /root/ToolsWrapper.sh ");
 
 
         commandBuilder.append(toolPath).append(" ").append("'").append(args.toString()).append("'");
